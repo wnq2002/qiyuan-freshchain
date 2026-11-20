@@ -74,7 +74,7 @@ const SCENARIOS = [
   {
     no: 'LT20261118003',
     customer: '康泰医药流通',
-    cargo: '疫苗类生物制品（2~8℃）',
+    cargo: '冷藏注射剂（0~4℃）',
     zone: 'chilled',
     origin: '南宁高新区医药仓',
     dest: '桂林七星区疾控中心',
@@ -148,7 +148,7 @@ const SCENARIOS = [
   {
     no: 'LT20261118006',
     customer: '康泰医药流通',
-    cargo: '血液制品（2~8℃）',
+    cargo: '冷藏生物制剂（0~4℃）',
     zone: 'chilled',
     origin: '南宁高新区医药仓',
     dest: '百色右江区医院',

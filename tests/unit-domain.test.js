@@ -12,6 +12,7 @@ const assert = require('node:assert');
 const { buildContext, judge, findExcursions, findGaps, assessCompleteness, TOLERANCE, MIN_EXCURSION_MIN } = require('../src/domain/analyze');
 const { regressWindow, overlaps } = require('../src/domain/rule-utils');
 const { RULES, PARTY } = require('../src/domain/rules');
+const { SCENARIOS, ZONES } = require('../src/domain/scenarios');
 
 const M = 60000;
 const T0 = Date.UTC(2026, 10, 18, 0, 0, 0);
@@ -176,5 +177,21 @@ test('责任主体字典: 六个主体齐备', () => {
   for (const k of ['SHIP', 'CARR', 'CONS', 'EQUIP', 'NONE', 'UNKNOWN']) {
     assert.ok(PARTY[k], `缺主体 ${k}`);
     assert.ok(PARTY[k].name, `${k} 缺中文名`);
+  }
+});
+
+test('场景数据自洽：货物标注温区必须与业务温区一致', () => {
+  // 防的是这种矛盾：货物写"疫苗（2~8℃）"，但温区定义是 0~4℃，
+  // 看板与详情页会同时显示两个冲突的温度要求，客户一眼就能看出系统不可信。
+  const re = /[（(]\s*(-?\d+(?:\.\d+)?)\s*[~～]\s*(-?\d+(?:\.\d+)?)\s*℃\s*[)）]/;
+  for (const sc of SCENARIOS) {
+    const m = sc.cargo && sc.cargo.match(re);
+    if (!m) continue;
+    const z = ZONES[sc.zone];
+    assert.ok(z, `${sc.no} 引用了未定义的温区 ${sc.zone}`);
+    const lo = Number(m[1]);
+    const hi = Number(m[2]);
+    assert.equal(lo, z.zoneMin, `${sc.no} 货物标注下限 ${lo}℃ ≠ 温区下限 ${z.zoneMin}℃`);
+    assert.equal(hi, z.zoneMax, `${sc.no} 货物标注上限 ${hi}℃ ≠ 温区上限 ${z.zoneMax}℃`);
   }
 });
