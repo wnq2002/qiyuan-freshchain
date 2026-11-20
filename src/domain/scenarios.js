@@ -186,13 +186,13 @@ const SCENARIOS = [
     durationMin: 280,
     // 数据缺失 35 分钟，且跨超温区间
     sim: {
-      setPoint: 2, seed: 77, doors: [{ at: 100, durationMin: 25 }],
-      gaps: [{ at: 95, durationMin: 35 }],
+      setPoint: 2, seed: 77, doors: [{ at: 100, durationMin: 45 }],
+      gaps: [{ at: 115, durationMin: 25 }],
     },
     events: [
       { type: 'load_start', atMin: 0, actor: '发货方·组板员', note: '开始装车' },
       { type: 'depart', atMin: 30, actor: '司机·陆文斌', note: '装车完成出发' },
-      { type: 'door_open', atMin: 100, durationMin: 25, actor: '司机·陆文斌', note: '开门查货' },
+      { type: 'door_open', atMin: 100, durationMin: 45, actor: '司机·陆文斌', note: '开门查货，记录仪同时断数据' },
       { type: 'arrive', atMin: 250, actor: '司机·陆文斌', note: '到达门店' },
       { type: 'unload_end', atMin: 280, actor: '收货方·理货员', note: '卸货完成' },
     ],

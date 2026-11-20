@@ -127,6 +127,9 @@ function findExcursions(rs, waybill) {
   return groups.map((g) => {
     const first = g.idx[0];
     const last = g.idx[g.idx.length - 1];
+    // 去抖：单个样本越界视为传感器抖动，不构成超温区间。
+    // 物理依据：真实超温有热惯性，不可能只持续一个采样周期就立即回落。
+    if (g.idx.length < 2) return null;
     const from = crossTime(rs, first, out, 'start');
     const to = crossTime(rs, last, out, 'end');
     const temps = g.idx.map((i) => rs[i]);
@@ -140,7 +143,7 @@ function findExcursions(rs, waybill) {
       direction: peak.temp > hi ? 'high' : 'low',
       samples: temps.length,
     };
-  }).filter((x) => x.minutes >= MIN_EXCURSION_MIN);
+  }).filter((x) => x !== null && x.minutes >= MIN_EXCURSION_MIN);
 }
 
 function center(w) {
@@ -153,15 +156,13 @@ function crossTime(rs, i, out, mode) {
     if (i === 0) return rs[i].ts;
     const prev = rs[i - 1];
     if (out(prev.temp)) return rs[i].ts;
-    // 阈值取最近的那个边界：用中点近似，实际越界点介于两者之间
-    const ratio = 0.5;
-    return prev.ts + (rs[i].ts - prev.ts) * ratio;
+    // 真实越界点在 prev 与 rs[i] 之间，取中点（无更多信息时的最小假设）
+    return prev.ts + (rs[i].ts - prev.ts) * 0.5;
   }
   if (i === rs.length - 1) return rs[i].ts;
   const next = rs[i + 1];
   if (out(next.temp)) return rs[i].ts;
-  const ratio = 0.5;
-  return rs[i].ts + (next.ts - rs[i].ts) * ratio;
+  return rs[i].ts + (next.ts - rs[i].ts) * 0.5;
 }
 
 /** 采样空洞：相邻读数间隔 > 20 分钟 */
@@ -209,6 +210,34 @@ function computeRisingWindows(rs, evs) {
  * 返回结构稳定，可直接落盘为判定快照
  */
 function judge(ctx, ruleVersion = 'v1.0') {
+  // 在途运单只做「当下状态」判定，不出最终责任结论：
+  // 责任认定需要完整行程（到货、卸货结束），在途给结论等于提前定罪。
+  if (ctx.waybill && ctx.waybill.status === 'transit') {
+    return {
+      ruleId: 'IN_TRANSIT',
+      ruleName: '在途监测',
+      party: 'PENDING',
+      partyName: '在途未定责',
+      why: '运单尚未完成，责任认定需等全程温度与事件齐备后再判，当前仅做过程监测。',
+      confidence: null,
+      detail: ctx.excursions.length
+        ? `在途已出现 ${ctx.excursions.length} 段超温，累计 ${Math.round(ctx.excursions.reduce((a, x) => a + x.minutes, 0))} 分钟，请立即联系司机核实。`
+        : '在途温度处于温区内，暂无异常。',
+      evidence: [
+        { label: '最新温度', value: ctx.readings.length ? `${ctx.readings[ctx.readings.length - 1].temp.toFixed(1)}℃` : '—' },
+        { label: '已产生超温', value: `${ctx.excursions.length} 段` },
+        { label: '温区要求', value: `[${ctx.waybill.zoneMin}, ${ctx.waybill.zoneMax}]℃` },
+        { label: '定责时点', value: '到货并卸货完成后自动判定' },
+      ],
+      needManual: false,
+      ruleVersion,
+      judgedAt: null,
+      summary: ctx.excursions.length
+        ? `在途超温 ${ctx.excursions.length} 段，待完成后定责`
+        : '在途正常，待完成后定责',
+    };
+  }
+
   const ordered = [...RULES].sort((a, b) => a.priority - b.priority);
   for (const rule of ordered) {
     const hit = rule.test(ctx);
